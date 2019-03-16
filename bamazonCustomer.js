@@ -1,124 +1,101 @@
+// Initializes the npm packages used
 var mysql = require("mysql");
 var inquirer = require("inquirer");
-
-// create the connection information for the sql database
+require("console.table");
 var connection = mysql.createConnection({
   host: "localhost",
-
-  // Your port; if not 3306
   port: 3306,
-
-  // Your username
   user: "root",
-
-  // Your password
   password: "Bayside94!",
-  database: "bamazon_DB"
+  database: "bamazon_db"
+  // reject UNATHORIZED?
 });
-
-// connect to the mysql server and sql database
 connection.connect(function(err) {
-  if (err) throw err;
-  // run the start function after the connection is made to prompt the user
-  start();
+  if (err) {
+    console.error("error connecting: " + err.stack);
+  }
+  allProducts();
 });
 
-// function which prompts the user for what action they should take
-function start() {
+function allProducts() {
+    connection.query("SELECT * FROM products", function(err, res) {
+      if (err) throw err;
+      console.table(res);
+   promptCustomer(res);
+    });
+  }
+
+
+function promptCustomer(inventory) {
+
+  inquirer
+.prompt([
+      {
+        type: "input",
+        name: "choice",
+        message: "What is the ID of the item ?",
+        validate: function(val) {
+          return !isNaN(val);
+        }
+      }
+    ])
+    .then(function(val) {
+      var choiceId = parseInt(val.choice);
+      var product = checkInventory(choiceId, inventory);
+if (product) {
+       promptCustomerForQuantity(product);
+      }
+      else {
+        console.log("\nThat item is not in the inventory.");
+        allProducts();
+      }
+    });
+  
+}
+
+function promptCustomerForQuantity(product) {
   inquirer
     .prompt([
-        {
-        name: "item",
+      {
         type: "input",
-        message: "What is the  ID of the product they would like to buy?"
-        },
-        // .then(function(answer) {
-        //   // get the information of the chosen item
-        //   var chosenItem;
-        //   for (var i = 0; i < results.length; i++) {
-        //     if (results[i].item_name === answer.choice) {
-        //       chosenItem = results[i];
-        //     }
-        //   }
-  
-        
-      ])
-      .then(function(answer) {
-        inquirer
-        .prompt([
-          {
-              name: "inventory",
-              type: "input",
-              message: "how many units of the product would u  like to buy?"
-            },
-          
-        ])
-    })
-    validate: function(value) {
-      if (isNaN(value) === false) {
-        return true;
+        name: "quantity",
+        message: "How many would you like? ",
+        validate: function(val) {
+          return val > 0 || val.toLowerCase() === "q";
+        }
       }
-      return false;
-    }
-  }
-])
-.then(function(answer) {
-  // when finished prompting, insert a new item into the db with that info
-  connection.query(
-    if (answer.postOrBid === "POST") {
-    // Once the customer has placed the order, your application should check if your store has enough of the product to meet the customer's request.
-    // validate function
-    // Once the customer has placed the order, your application should check if your store has enough of the product to meet the customer's request.
+    ])
+    .then(function(val) {
+      var quantity = parseInt(val.quantity);
 
-// determine if bid was high enough/////determine if there inventory for order
-if (chosenItem.highest_bid < parseInt(answer.bid)) {
-  // bid was high enough, so update db, let the user know, and start over
-  connection.query(
-    "UPDATE auctions SET ? WHERE ?",
-    [
-      {
-        highest_bid: answer.bid
-      },
-      {
-        id: chosenItem.id
+      // If there isn't enough of the chosen product and quantity, let the user know and re-run allProducts
+      if (quantity > product.stock_quantity) {
+        console.log("\nInsufficient quantity!");
+        allProducts();
       }
-    ],
-    function(error) {
-      if (error) throw err;
-      console.log("Bid placed successfully!");
-      start();
+      else { makePurchase(product, quantity);
+      }
+    });
+}
+function makePurchase(product, quantity) {
+  connection.query(
+    "UPDATE products SET stock_quantity = stock_quantity - ? WHERE item_id = ?",
+    [quantity, product.item_id],
+    function(err, res) {console.log("\nSuccessfully purchased " + quantity + " " + product.product_name + "'s!");
+      allProducts();
     }
   );
 }
-else {
-
-// If not, the app should log a phrase like Insufficient quantity!, and then prevent the order from going through.
-
-
-
-// However, if your store does have enough of the product, you should fulfill the customer's order.
-
-
-// This means updating the SQL database to reflect the remaining quantity.
-function updateProduct (){
-  var query = connection.query(
-    "UPDATE products SET ? WHERE ?",
-    [
-      {
-        quantity: 100
-      },
-      {
-        flavor: "Rocky Road"
-      }
-    ],
-    function(err, res) {
-      console.log(res.affectedRows + " products updated!\n");
-      // Call deleteProduct AFTER the UPDATE completes
-      deleteProduct();
+function checkInventory(choiceId, inventory) {
+  for (var i = 0; i < inventory.length; i++) {
+    if (inventory[i].item_id === choiceId) {
+      return inventory[i];
     }
-  );
   }
-// Once the update goes through, show the customer the total cost of their purchase.
-function readProducts ()
+  return null;
+}
 
-// why is choices an option ?
+  
+
+
+
